@@ -2,7 +2,7 @@
   "name": "dark-violet-theme-vscode",
   "displayName": "dark-violet-theme-vscode",
   "description": "Dark Color Theme with Violet as main color pallet",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "engines": {
     "vscode": "^1.69.0"
   },
