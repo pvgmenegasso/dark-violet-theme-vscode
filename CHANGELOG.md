@@ -14,7 +14,10 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 Fix some color definitions that made it hard to identify UI elements due to low contrast
 - Mainly colors on side bar when scrolling through list elements and scrollbar color
 
-
 ## [1.0.2]
 
 Extended previous fix for keyboard highlighted list items also
+
+## [1.0.3]
+
+Fix integrated terminal colors
