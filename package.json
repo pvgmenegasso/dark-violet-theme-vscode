@@ -3,7 +3,7 @@
   "displayName": "dark-violet-theme-vscode",
   "description": "Dark Color Theme with Violet as main color pallet",
   "icon": "icon.png",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "engines": {
     "vscode": "^1.69.0"
   },
@@ -32,11 +32,5 @@
         "path": "./themes/Dark Violet Theme-color-theme.json"
       }
     ]
-  },
-  "devDependencies": {
-    "esbuild": "^0.15.6"
-  },
-  "dependencies": {
-    "vss-web-extension-sdk": "^5.141.0"
   }
 }
