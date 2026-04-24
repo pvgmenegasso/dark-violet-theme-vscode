@@ -1,40 +1,120 @@
-name: Release VSIX
+name: VS Code Extension CI/CD
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - master
   workflow_dispatch:
+    inputs:
+      release_type:
+        description: "Release type"
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      publish_ovsx:
+        description: "Also publish to Open VSX Registry?"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
-  build-and-release:
+  # ─── CI: Lint → Test → Build ──────────────────────────────────────────────
+  ci:
+    name: CI
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Compile
+        run: npm run compile
+
+      - name: Run tests (headless)
+        run: xvfb-run -a npm test
+        env:
+          DISPLAY: ":99.0"
+
+      - name: Package extension (.vsix)
+        run: npx vsce package --no-dependencies
+
+      - name: Upload .vsix artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vsix-package
+          path: "*.vsix"
+          retention-days: 7
+
+  # ─── Release & Publish (manual trigger only) ──────────────────────────────
+  release:
+    name: Release & Publish
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.event_name == 'workflow_dispatch'
     permissions:
       contents: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Package extension
-        run: npx vsce package --no-dependencies -o extension.vsix
+      - name: Bump version
+        id: bump
+        run: |
+          NEW_VERSION=$(npm version ${{ inputs.release_type }} --no-git-tag-version)
+          echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Get version
-        id: version
-        run: echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+      - name: Package extension (.vsix)
+        run: npx vsce package --no-dependencies
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "chore: release ${{ steps.bump.outputs.version }}"
+          git tag ${{ steps.bump.outputs.tag }}
+          git push origin main --tags
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name || format('v{0}', steps.version.outputs.VERSION) }}
-          name: v${{ steps.version.outputs.VERSION }}
-          files: extension.vsix
+          tag_name: ${{ steps.bump.outputs.tag }}
+          name: ${{ steps.bump.outputs.version }}
           generate_release_notes: true
+          files: "*.vsix"
+
+      - name: Publish to VS Code Marketplace
+        run: npx vsce publish --no-dependencies --pat ${{ secrets.VSCE_PAT }}
+
+      - name: Publish to Open VSX Registry
+        if: inputs.publish_ovsx == 'true'
+        run: npx ovsx publish --pat ${{ secrets.OVSX_PAT }}
